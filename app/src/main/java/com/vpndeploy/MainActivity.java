@@ -46,15 +46,15 @@ public class MainActivity extends AppCompatActivity {
         btnConfigs.setOnClickListener(v -> downloadConfigs());
     }
     
-    private String getVpsBase64() {
+    private byte[] getVpsBinary() {
         try {
             InputStream is = getAssets().open("vps");
             byte[] data = new byte[is.available()];
             is.read(data);
             is.close();
-            return Base64.encodeToString(data, Base64.NO_WRAP);
+            return data;
         } catch (Exception e) {
-            return "";
+            return null;
         }
     }
     
@@ -69,14 +69,53 @@ public class MainActivity extends AppCompatActivity {
         
         String services = getServices();
         
-        // Копируем vps бинарник через base64
-        String vpsB64 = getVpsBase64();
-        String cmd = "echo '" + vpsB64 + "' | base64 -d > /tmp/vps && " +
-                     "chmod +x /tmp/vps && " +
-                     "/tmp/vps deploy -H " + host + 
-                     " --password " + password + " -s " + services;
-        
-        executeCommand(host, password, cmd);
+        executor.execute(() -> {
+            try {
+                SshClient ssh = new SshClient(host, 22, "root", password);
+                ssh.connect();
+                appendOutput("✅ Connected\n");
+                
+                // Проверяем есть ли уже vps на сервере
+                String check = ssh.exec("test -f /tmp/vps && echo yes || echo no");
+                
+                if (check.contains("no")) {
+                    appendOutput("📤 Uploading vps binary...\n");
+                    
+                    byte[] vpsBin = getVpsBinary();
+                    String b64 = Base64.encodeToString(vpsBin, Base64.NO_WRAP);
+                    
+                    // Разбиваем base64 на части по 1000 символов
+                    int chunkSize = 1000;
+                    for (int i = 0; i < b64.length(); i += chunkSize) {
+                        int end = Math.min(i + chunkSize, b64.length());
+                        String chunk = b64.substring(i, end);
+                        if (i == 0) {
+                            ssh.exec("echo '" + chunk + "' > /tmp/vps.b64");
+                        } else {
+                            ssh.exec("echo '" + chunk + "' >> /tmp/vps.b64");
+                        }
+                    }
+                    ssh.exec("base64 -d /tmp/vps.b64 > /tmp/vps && chmod +x /tmp/vps && rm /tmp/vps.b64");
+                    appendOutput("✅ Binary uploaded\n");
+                }
+                
+                // Деплой
+                appendOutput("🚀 Deploying services...\n");
+                String result = ssh.exec("/tmp/vps deploy -H " + host + " --password " + password + " -s " + services);
+                appendOutput(result);
+                
+                ssh.close();
+                appendOutput("\n✅ Done\n");
+            } catch (Exception e) {
+                appendOutput("❌ " + e.getMessage() + "\n");
+            } finally {
+                runOnUiThread(() -> {
+                    btnDeploy.setEnabled(true);
+                    btnStatus.setEnabled(true);
+                    btnConfigs.setEnabled(true);
+                });
+            }
+        });
     }
     
     private String getServices() {
@@ -91,19 +130,18 @@ public class MainActivity extends AppCompatActivity {
     private void checkStatus() {
         String host = etHost.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
-        executeCommand(host, password, 
-            "/tmp/vps status -H " + host + " --password " + password);
+        execSimple(host, password, "/tmp/vps status -H " + host + " --password " + password);
     }
     
     private void downloadConfigs() {
         String host = etHost.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
-        executeCommand(host, password, 
+        execSimple(host, password, 
             "/tmp/vps configs -H " + host + " --password " + password +
-            " -s " + getServices() + " -o /tmp/cfg && find /tmp/cfg -type f -exec echo '--- {} ---' \\; -exec cat {} \\;");
+            " -s " + getServices() + " -o /tmp/cfg && find /tmp/cfg -type f -exec echo '=== {} ===' \\; -exec cat {} \\;");
     }
     
-    private void executeCommand(String host, String password, String command) {
+    private void execSimple(String host, String password, String cmd) {
         btnDeploy.setEnabled(false);
         btnStatus.setEnabled(false);
         btnConfigs.setEnabled(false);
@@ -115,13 +153,9 @@ public class MainActivity extends AppCompatActivity {
                 SshClient ssh = new SshClient(host, 22, "root", password);
                 ssh.connect();
                 appendOutput("✅ Connected\n");
-                appendOutput("⏳ Running...\n");
-                
-                String result = ssh.executeCommand(command);
+                String result = ssh.exec(cmd);
                 appendOutput(result);
-                
                 ssh.close();
-                appendOutput("\n✅ Done\n");
             } catch (Exception e) {
                 appendOutput("❌ " + e.getMessage() + "\n");
             } finally {
