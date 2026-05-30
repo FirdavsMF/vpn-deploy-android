@@ -23,34 +23,35 @@ public class SshClient {
         session = jsch.getSession(user, host, port);
         session.setPassword(password);
         session.setConfig("StrictHostKeyChecking", "no");
-        session.connect(10000);
+        session.setTimeout(30000);
+        session.connect(30000);
     }
     
     public String executeCommand(String command) throws Exception {
         ChannelExec channel = (ChannelExec) session.openChannel("exec");
         channel.setCommand(command);
         
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        ByteArrayOutputStream errorStream = new ByteArrayOutputStream();
-        channel.setOutputStream(outputStream);
-        channel.setErrStream(errorStream);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ByteArrayOutputStream err = new ByteArrayOutputStream();
+        channel.setOutputStream(out);
+        channel.setErrStream(err);
         
-        channel.connect();
+        channel.connect(60000);
         
         while (!channel.isClosed()) {
-            Thread.sleep(100);
+            Thread.sleep(200);
         }
         
-        String output = outputStream.toString();
-        String error = errorStream.toString();
+        String output = out.toString();
+        String error = err.toString();
         
         channel.disconnect();
         
-        if (!error.isEmpty() && !error.contains("Warning")) {
-            throw new Exception(error);
+        if (!error.isEmpty() && !error.startsWith("Warning") && !error.contains("Permanently added")) {
+            return "Error: " + error;
         }
         
-        return output;
+        return output.isEmpty() ? "No output" : output;
     }
     
     public void close() {

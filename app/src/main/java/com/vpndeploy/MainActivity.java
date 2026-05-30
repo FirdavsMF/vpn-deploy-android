@@ -1,6 +1,7 @@
 package com.vpndeploy;
 
 import android.os.Bundle;
+import android.util.Base64;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
@@ -45,6 +46,18 @@ public class MainActivity extends AppCompatActivity {
         btnConfigs.setOnClickListener(v -> downloadConfigs());
     }
     
+    private String getVpsBase64() {
+        try {
+            InputStream is = getAssets().open("vps");
+            byte[] data = new byte[is.available()];
+            is.read(data);
+            is.close();
+            return Base64.encodeToString(data, Base64.NO_WRAP);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+    
     private void deployServices() {
         String host = etHost.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
@@ -54,50 +67,40 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         
-        String services = getAllServices();
+        String services = getServices();
         
-        // Сначала устанавливаем vps на сервер, потом деплоим
-        String installCmd = "cat > /tmp/vps << 'VPSEOF'\n" + 
-            readAssetFile("vps") + "\nVPSEOF\n" +
-            "chmod +x /tmp/vps && /tmp/vps deploy -H " + host + 
-            " --password " + password + " -s " + services;
+        // Копируем vps бинарник через base64
+        String vpsB64 = getVpsBase64();
+        String cmd = "echo '" + vpsB64 + "' | base64 -d > /tmp/vps && " +
+                     "chmod +x /tmp/vps && " +
+                     "/tmp/vps deploy -H " + host + 
+                     " --password " + password + " -s " + services;
         
-        executeCommand(host, password, installCmd);
+        executeCommand(host, password, cmd);
     }
     
-    private String getAllServices() {
-        StringBuilder services = new StringBuilder();
-        if (cbVless.isChecked()) services.append("vless,");
-        if (cbSS.isChecked()) services.append("shadowsocks,");
-        if (cbHY2.isChecked()) services.append("hysteria2,");
-        if (cbSSH.isChecked()) services.append("ssh,");
-        if (services.length() == 0) return "all";
-        return services.toString().replaceAll(",$", "");
-    }
-    
-    private String readAssetFile(String filename) {
-        try {
-            InputStream is = getAssets().open(filename);
-            return new String(is.readAllBytes());
-        } catch (Exception e) {
-            return "";
-        }
+    private String getServices() {
+        StringBuilder sb = new StringBuilder();
+        if (cbVless.isChecked()) sb.append("vless,");
+        if (cbSS.isChecked()) sb.append("shadowsocks,");
+        if (cbHY2.isChecked()) sb.append("hysteria2,");
+        if (cbSSH.isChecked()) sb.append("ssh,");
+        return sb.length() == 0 ? "all" : sb.toString().replaceAll(",$", "");
     }
     
     private void checkStatus() {
         String host = etHost.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
         executeCommand(host, password, 
-            "docker ps --filter 'name=vpn' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'");
+            "/tmp/vps status -H " + host + " --password " + password);
     }
     
     private void downloadConfigs() {
         String host = etHost.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
-        String services = getAllServices();
         executeCommand(host, password, 
-            "/tmp/vps configs -H " + host + " --password " + password + 
-            " -s " + services + " -o /tmp/vpn-configs && cat /tmp/vpn-configs/all-configs.txt");
+            "/tmp/vps configs -H " + host + " --password " + password +
+            " -s " + getServices() + " -o /tmp/cfg && find /tmp/cfg -type f -exec echo '--- {} ---' \\; -exec cat {} \\;");
     }
     
     private void executeCommand(String host, String password, String command) {
@@ -105,20 +108,22 @@ public class MainActivity extends AppCompatActivity {
         btnStatus.setEnabled(false);
         btnConfigs.setEnabled(false);
         tvOutput.setText("");
-        appendOutput("⚡ Connecting to " + host + "...\n");
+        appendOutput("⚡ " + host + "\n");
         
         executor.execute(() -> {
             try {
                 SshClient ssh = new SshClient(host, 22, "root", password);
                 ssh.connect();
                 appendOutput("✅ Connected\n");
+                appendOutput("⏳ Running...\n");
                 
                 String result = ssh.executeCommand(command);
                 appendOutput(result);
                 
                 ssh.close();
+                appendOutput("\n✅ Done\n");
             } catch (Exception e) {
-                appendOutput("❌ Error: " + e.getMessage() + "\n");
+                appendOutput("❌ " + e.getMessage() + "\n");
             } finally {
                 runOnUiThread(() -> {
                     btnDeploy.setEnabled(true);
