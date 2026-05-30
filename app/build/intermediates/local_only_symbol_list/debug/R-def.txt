@@ -1,0 +1,16 @@
+R_DEF: Internal format may change without notice
+local
+id btnConfigs
+id btnDeploy
+id btnStatus
+id cbHY2
+id cbSS
+id cbSSH
+id cbVless
+id etHost
+id etPassword
+id scrollView
+id tvOutput
+layout activity_main
+string app_name
+style Theme.AppCompat.DayNight.DarkActionBar
