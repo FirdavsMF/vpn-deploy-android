@@ -4,12 +4,12 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp"
-    android:background="#121212">
+    android:background="#0d1117">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="VPN Deploy"
+        android:text="🔐 VPN Deploy"
         android:textSize="24sp"
         android:textColor="#fff"
         android:textStyle="bold"
@@ -18,29 +18,49 @@
     <EditText
         android:id="@+id/etHost"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="IP адрес"
-        android:textColor="#fff"
-        android:textColorHint="#888"
+        android:layout_height="48dp"
+        android:hint="IP адрес VPS"
+        android:textColor="#c9d1d9"
+        android:textColorHint="#484f58"
+        android:background="#161b22"
+        android:padding="12dp"
         android:layout_marginBottom="8dp"/>
 
     <EditText
         android:id="@+id/etPassword"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Пароль"
+        android:layout_height="48dp"
+        android:hint="SSH пароль"
         android:inputType="textPassword"
-        android:textColor="#fff"
-        android:textColorHint="#888"
-        android:layout_marginBottom="16dp"/>
+        android:textColor="#c9d1d9"
+        android:textColorHint="#484f58"
+        android:background="#161b22"
+        android:padding="12dp"
+        android:layout_marginBottom="12dp"/>
+
+    <Spinner
+        android:id="@+id/spProtocol"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginBottom="12dp"
+        android:background="#161b22"/>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
-        <Button android:id="@+id/btnDeploy" android:layout_width="0dp" android:layout_weight="1" android:text="DEPLOY" android:layout_marginEnd="4dp"/>
-        <Button android:id="@+id/btnStatus" android:layout_width="0dp" android:layout_weight="1" android:text="STATUS" android:layout_marginEnd="4dp"/>
-        <Button android:id="@+id/btnConfigs" android:layout_width="0dp" android:layout_weight="1" android:text="CONFIGS"/>
+        android:orientation="horizontal"
+        android:layout_marginBottom="4dp">
+        <Button android:id="@+id/btnDeploy" android:layout_width="0dp" android:layout_weight="1" android:text="🚀 DEPLOY" android:textColor="#fff" android:backgroundTint="#238636" android:layout_marginEnd="4dp"/>
+        <Button android:id="@+id/btnStatus" android:layout_width="0dp" android:layout_weight="1" android:text="📊 STATUS" android:textColor="#c9d1d9" android:backgroundTint="#21262d" android:layout_marginEnd="4dp"/>
+    </LinearLayout>
+    
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="12dp">
+        <Button android:id="@+id/btnConfigs" android:layout_width="0dp" android:layout_weight="1" android:text="📁 CONFIGS" android:textColor="#c9d1d9" android:backgroundTint="#21262d" android:layout_marginEnd="4dp"/>
+        <Button android:id="@+id/btnConnect" android:layout_width="0dp" android:layout_weight="1" android:text="🔌 CONNECT" android:textColor="#fff" android:backgroundTint="#1f6feb"/>
     </LinearLayout>
 
     <ScrollView
@@ -48,16 +68,16 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="16dp"
-        android:background="#1a1a1a">
+        android:background="#0d1117">
         <TextView
             android:id="@+id/tvOutput"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="#0f0"
+            android:textColor="#00ff41"
             android:typeface="monospace"
+            android:textSize="12sp"
             android:padding="8dp"
-            android:text="Ready..."/>
+            android:text="Готов к работе..."/>
     </ScrollView>
 
 </LinearLayout>
