@@ -9,7 +9,7 @@ import java.io.*;
 public class SettingsActivity extends AppCompatActivity {
     
     private EditText etHost, etPassword, etName;
-    private Button btnSave, btnLoad;
+    private Button btnSave;
     private ListView lvServers;
     private String serversFile;
     
@@ -24,7 +24,6 @@ public class SettingsActivity extends AppCompatActivity {
         etHost = findViewById(R.id.etHost);
         etPassword = findViewById(R.id.etPassword);
         btnSave = findViewById(R.id.btnSave);
-        btnLoad = findViewById(R.id.btnLoad);
         lvServers = findViewById(R.id.lvServers);
         
         btnSave.setOnClickListener(v -> saveServer());
@@ -42,7 +41,6 @@ public class SettingsActivity extends AppCompatActivity {
         try {
             JSONArray servers = loadServersArray();
             
-            // Проверка на дубликат
             for (int i = 0; i < servers.length(); i++) {
                 if (servers.getJSONObject(i).getString("host").equals(host)) {
                     servers.remove(i);
@@ -100,7 +98,6 @@ public class SettingsActivity extends AppCompatActivity {
             lvServers.setOnItemClickListener((parent, view, pos, id) -> {
                 try {
                     JSONObject s = servers.getJSONObject(pos);
-                    // Возвращаем данные в MainActivity
                     getSharedPreferences("vpn", MODE_PRIVATE).edit()
                         .putString("host", s.getString("host"))
                         .putString("password", s.getString("password"))
