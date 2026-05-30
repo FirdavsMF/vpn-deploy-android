@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
+import java.io.*;
 import java.util.concurrent.*;
 
 public class MainActivity extends AppCompatActivity {
@@ -53,34 +54,50 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         
-        StringBuilder services = new StringBuilder("all");
-        if (!cbVless.isChecked() && !cbSS.isChecked() && 
-            !cbHY2.isChecked() && !cbSSH.isChecked()) {
-            services = new StringBuilder("all");
-        } else {
-            services = new StringBuilder();
-            if (cbVless.isChecked()) services.append("vless,");
-            if (cbSS.isChecked()) services.append("shadowsocks,");
-            if (cbHY2.isChecked()) services.append("hysteria2,");
-            if (cbSSH.isChecked()) services.append("ssh,");
+        String services = getAllServices();
+        
+        // Сначала устанавливаем vps на сервер, потом деплоим
+        String installCmd = "cat > /tmp/vps << 'VPSEOF'\n" + 
+            readAssetFile("vps") + "\nVPSEOF\n" +
+            "chmod +x /tmp/vps && /tmp/vps deploy -H " + host + 
+            " --password " + password + " -s " + services;
+        
+        executeCommand(host, password, installCmd);
+    }
+    
+    private String getAllServices() {
+        StringBuilder services = new StringBuilder();
+        if (cbVless.isChecked()) services.append("vless,");
+        if (cbSS.isChecked()) services.append("shadowsocks,");
+        if (cbHY2.isChecked()) services.append("hysteria2,");
+        if (cbSSH.isChecked()) services.append("ssh,");
+        if (services.length() == 0) return "all";
+        return services.toString().replaceAll(",$", "");
+    }
+    
+    private String readAssetFile(String filename) {
+        try {
+            InputStream is = getAssets().open(filename);
+            return new String(is.readAllBytes());
+        } catch (Exception e) {
+            return "";
         }
-        
-        String cmd = "vps deploy -H " + host + " --password " + password + 
-                     " -s " + services.toString().replaceAll(",$", "");
-        
-        executeCommand(host, password, cmd);
     }
     
     private void checkStatus() {
         String host = etHost.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
-        executeCommand(host, password, "docker ps --filter 'name=vpn' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'");
+        executeCommand(host, password, 
+            "docker ps --filter 'name=vpn' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'");
     }
     
     private void downloadConfigs() {
         String host = etHost.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
-        executeCommand(host, password, "vps configs -H " + host + " --password " + password + " -o /tmp/configs && cat /tmp/configs/all-configs.txt");
+        String services = getAllServices();
+        executeCommand(host, password, 
+            "/tmp/vps configs -H " + host + " --password " + password + 
+            " -s " + services + " -o /tmp/vpn-configs && cat /tmp/vpn-configs/all-configs.txt");
     }
     
     private void executeCommand(String host, String password, String command) {
@@ -88,26 +105,22 @@ public class MainActivity extends AppCompatActivity {
         btnStatus.setEnabled(false);
         btnConfigs.setEnabled(false);
         tvOutput.setText("");
+        appendOutput("⚡ Connecting to " + host + "...\n");
         
         executor.execute(() -> {
             try {
                 SshClient ssh = new SshClient(host, 22, "root", password);
                 ssh.connect();
+                appendOutput("✅ Connected\n");
                 
                 String result = ssh.executeCommand(command);
-                
-                runOnUiThread(() -> {
-                    appendOutput("✅ Connected\n");
-                    appendOutput(result);
-                    btnDeploy.setEnabled(true);
-                    btnStatus.setEnabled(true);
-                    btnConfigs.setEnabled(true);
-                });
+                appendOutput(result);
                 
                 ssh.close();
             } catch (Exception e) {
+                appendOutput("❌ Error: " + e.getMessage() + "\n");
+            } finally {
                 runOnUiThread(() -> {
-                    appendOutput("❌ Error: " + e.getMessage() + "\n");
                     btnDeploy.setEnabled(true);
                     btnStatus.setEnabled(true);
                     btnConfigs.setEnabled(true);
@@ -117,8 +130,10 @@ public class MainActivity extends AppCompatActivity {
     }
     
     private void appendOutput(String text) {
-        tvOutput.append(text + "\n");
-        scrollView.post(() -> scrollView.fullScroll(View.FOCUS_DOWN));
+        runOnUiThread(() -> {
+            tvOutput.append(text + "\n");
+            scrollView.post(() -> scrollView.fullScroll(View.FOCUS_DOWN));
+        });
     }
     
     @Override
