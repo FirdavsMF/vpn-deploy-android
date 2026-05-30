@@ -31,6 +31,18 @@ public class MainActivity extends AppCompatActivity {
         setListeners();
     }
     
+    @Override
+    protected void onResume() {
+        super.onResume();
+        String savedHost = getSharedPreferences("vpn", MODE_PRIVATE).getString("host", "");
+        String savedPass = getSharedPreferences("vpn", MODE_PRIVATE).getString("password", "");
+        if (!savedHost.isEmpty()) {
+            etHost.setText(savedHost);
+            etPassword.setText(savedPass);
+            log("📂 Загружен сервер: " + savedHost);
+        }
+    }
+
     private void initViews() {
         etHost = findViewById(R.id.etHost);
         etPassword = findViewById(R.id.etPassword);
