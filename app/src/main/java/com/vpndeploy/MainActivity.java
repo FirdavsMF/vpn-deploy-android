@@ -6,6 +6,7 @@ import android.net.VpnService;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.*;
+import android.content.Intent;
 import androidx.appcompat.app.AppCompatActivity;
 import java.util.concurrent.*;
 
@@ -28,6 +29,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         
         initViews();
+    private Button btnSettings;
         setListeners();
     }
     
@@ -50,6 +52,7 @@ public class MainActivity extends AppCompatActivity {
         btnStatus = findViewById(R.id.btnStatus);
         btnConfigs = findViewById(R.id.btnConfigs);
         btnConnect = findViewById(R.id.btnConnect);
+        btnSettings = findViewById(R.id.btnSettings);
         tvOutput = findViewById(R.id.tvOutput);
         tvStatus = findViewById(R.id.tvStatus);
         scrollView = findViewById(R.id.scrollView);
@@ -88,11 +91,13 @@ public class MainActivity extends AppCompatActivity {
         });
     }
     
+    private Button btnSettings;
     private void setListeners() {
         btnDeploy.setOnClickListener(v -> deployAll());
         btnStatus.setOnClickListener(v -> checkStatus());
         btnConfigs.setOnClickListener(v -> showConfigs());
         btnConnect.setOnClickListener(v -> connectVPN());
+        btnSettings.setOnClickListener(v -> startActivity(new Intent(this, SettingsActivity.class)));
     }
     
     // ========== DEPLOY ==========
