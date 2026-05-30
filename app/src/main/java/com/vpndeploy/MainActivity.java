@@ -19,7 +19,7 @@ public class MainActivity extends AppCompatActivity {
     private Spinner spProtocol;
     private Handler handler = new Handler(Looper.getMainLooper());
     private ExecutorService executor = Executors.newSingleThreadExecutor();
-    private String currentProtocol = "vless";
+    private String protocol = "vless";
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,13 +36,10 @@ public class MainActivity extends AppCompatActivity {
         scrollView = findViewById(R.id.scrollView);
         spProtocol = findViewById(R.id.spProtocol);
         
-        String[] protocols = {"VLESS", "Shadowsocks", "Hysteria2"};
-        spProtocol.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, protocols));
+        spProtocol.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, new String[]{"VLESS", "Shadowsocks", "Hysteria2"}));
         spProtocol.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                if (pos == 0) currentProtocol = "vless";
-                else if (pos == 1) currentProtocol = "ss";
-                else currentProtocol = "hysteria2";
+                if (pos == 0) protocol = "vless"; else if (pos == 1) protocol = "ss"; else protocol = "hysteria2";
             }
             public void onNothingSelected(AdapterView<?> p) {}
         });
@@ -53,115 +50,81 @@ public class MainActivity extends AppCompatActivity {
         btnConnect.setOnClickListener(v -> connectVPN());
     }
     
-    // ====== DEPLOY ======
     private void deploy() {
-        String host = etHost.getText().toString().trim();
-        String pass = etPassword.getText().toString().trim();
-        if (host.isEmpty() || pass.isEmpty()) { log("Enter host and password"); return; }
+        String h = etHost.getText().toString().trim();
+        String p = etPassword.getText().toString().trim();
+        if (h.isEmpty() || p.isEmpty()) { log("Enter host and password"); return; }
         
         executor.execute(() -> {
             try {
-                Session session = connect(host, pass);
-                log("Connected to " + host);
-                
-                ChannelSftp sftp = (ChannelSftp) session.openChannel("sftp");
+                Session s = connect(h, p);
+                log("Connected");
+                ChannelSftp sftp = (ChannelSftp) s.openChannel("sftp");
                 sftp.connect();
                 sftp.put(getAssets().open("vps"), "/tmp/vps");
                 sftp.disconnect();
-                exec(session, "chmod +x /tmp/vps");
-                log("Binary uploaded");
-                
-                log("Deploying all services...");
-                String result = exec(session, "/tmp/vps deploy -H " + host + " --password " + pass + " -s all 2>&1");
-                log(result);
-                log("Done!");
-                session.disconnect();
+                exec(s, "chmod +x /tmp/vps");
+                log("Deploying...");
+                log(exec(s, "/tmp/vps deploy -H " + h + " --password " + p + " -s all 2>&1"));
+                s.disconnect();
             } catch (Exception e) {
                 log("Error: " + e.getMessage());
             }
         });
     }
     
-    // ====== STATUS ======
     private void status() {
-        execOnServer("/tmp/vps status -H " + etHost.getText().toString().trim() + " --password " + etPassword.getText().toString().trim());
+        runCmd("/tmp/vps status -H " + etHost.getText().toString().trim() + " --password " + etPassword.getText().toString().trim());
     }
     
-    // ====== CONFIGS ======
     private void configs() {
-        String host = etHost.getText().toString().trim();
-        String pass = etPassword.getText().toString().trim();
-        execOnServer("/tmp/vps configs -H " + host + " --password " + pass + " -s all -o /tmp/cfg && cat /tmp/cfg/all-configs.txt 2>/dev/null || find /tmp/cfg -type f -exec cat {} \\;");
+        String h = etHost.getText().toString().trim();
+        String p = etPassword.getText().toString().trim();
+        runCmd("/tmp/vps configs -H " + h + " --password " + p + " -s all -o /tmp/cfg && find /tmp/cfg -type f -exec cat {} \\;");
     }
     
-    // ====== VPN CONNECT ======
     private void connectVPN() {
-        String host = etHost.getText().toString().trim();
-        String pass = etPassword.getText().toString().trim();
-        if (host.isEmpty() || pass.isEmpty()) { log("Enter host and password"); return; }
+        String h = etHost.getText().toString().trim();
+        String p = etPassword.getText().toString().trim();
+        if (h.isEmpty() || p.isEmpty()) { log("Enter host and password"); return; }
         
         executor.execute(() -> {
             try {
-                Session session = connect(host, pass);
-                String vpnUrl = "";
-                
-                if (currentProtocol.equals("vless")) {
-                    String uuid = exec(session, "cat /opt/vpn-deploy/services/vless/config.json 2>/dev/null | grep -o '\"id\":\"[^\"]*\"' | cut -d'\"' -f4").trim();
-                    if (uuid.isEmpty()) uuid = exec(session, "docker exec vless-vpn cat /etc/xray/config.json 2>/dev/null | grep -o '\"id\":\"[^\"]*\"' | cut -d'\"' -f4").trim();
-                    vpnUrl = "vless://" + uuid + "@" + host + ":443?encryption=none&security=none&type=tcp#VPN-Deploy";
-                } else if (currentProtocol.equals("ss")) {
-                    String sp = exec(session, "docker exec ss-vpn cat /etc/ss.json 2>/dev/null | grep -o '\"password\":\"[^\"]*\"' | cut -d'\"' -f4").trim();
-                    if (sp.isEmpty()) sp = exec(session, "cat /opt/vpn-deploy/services/shadowsocks/config.json 2>/dev/null | grep -o '\"password\":\"[^\"]*\"' | cut -d'\"' -f4").trim();
-                    String b64 = android.util.Base64.encodeToString(("aes-256-gcm:" + sp).getBytes(), android.util.Base64.NO_WRAP);
-                    vpnUrl = "ss://" + b64 + "@" + host + ":8388#VPN-Deploy";
+                Session s = connect(h, p);
+                String url = "";
+                if (protocol.equals("vless")) {
+                    String id = exec(s, "cat /opt/vpn-deploy/services/vless/config.json 2>/dev/null | grep -o '\"id\":\"[^\"]*\"' | cut -d'\"' -f4 || docker exec vless-vpn cat /etc/xray/config.json 2>/dev/null | grep -o '\"id\":\"[^\"]*\"' | cut -d'\"' -f4").trim();
+                    url = "vless://" + id + "@" + h + ":443#VPN";
+                } else if (protocol.equals("ss")) {
+                    String pw = exec(s, "cat /opt/vpn-deploy/services/shadowsocks/config.json 2>/dev/null | grep -o '\"password\":\"[^\"]*\"' | cut -d'\"' -f4 || docker exec ss-vpn cat /etc/ss.json 2>/dev/null | grep -o '\"password\":\"[^\"]*\"' | cut -d'\"' -f4").trim();
+                    url = "ss://" + android.util.Base64.encodeToString(("aes-256-gcm:" + pw).getBytes(), 0) + "@" + h + ":8388#VPN";
                 } else {
-                    String hp = exec(session, "cat /opt/vpn-deploy/services/hysteria2/config.yaml 2>/dev/null | grep 'password:' | awk '{print $2}'").trim();
-                    if (hp.isEmpty()) hp = exec(session, "docker exec hysteria2-vpn cat /etc/hysteria/config.yaml 2>/dev/null | grep 'password:' | awk '{print $2}'").trim();
-                    vpnUrl = "hysteria2://" + hp + "@" + host + ":443?insecure=1#VPN-Deploy";
+                    String pw = exec(s, "cat /opt/vpn-deploy/services/hysteria2/config.yaml 2>/dev/null | grep 'password:' | awk '{print $2}' || docker exec hysteria2-vpn cat /etc/hysteria/config.yaml 2>/dev/null | grep 'password:' | awk '{print $2}'").trim();
+                    url = "hysteria2://" + pw + "@" + h + ":443?insecure=1#VPN";
                 }
-                
-                session.disconnect();
-                
-                String finalUrl = vpnUrl;
+                s.disconnect();
+                String finalUrl = url;
                 handler.post(() -> {
                     log("🔗 " + finalUrl);
-                    log("✅ VPN URL готов! Импортируйте в sing-box/v2rayNG клиент");
-                    log("📋 Ссылка скопирована в буфер обмена");
-                    
-                    // Копируем в буфер
-                    android.content.ClipboardManager clipboard = 
-                        (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                    clipboard.setText(finalUrl);
-                    
-                    // Показываем диалог
-                    new android.app.AlertDialog.Builder(this)
-                        .setTitle("🔐 " + currentProtocol.toUpperCase() + " VPN")
-                        .setMessage("Ссылка скопирована!\n\nОткройте sing-box или v2rayNG\n→ Импорт из буфера обмена\n→ Подключить")
-                        .setPositiveButton("OK", null)
-                        .setNeutralButton("📋 Копировать еще раз", (d, w) -> {
-                            clipboard.setText(finalUrl);
-                            log("📋 Скопировано!");
-                        })
-                        .show();
+                    ((android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE)).setText(finalUrl);
+                    log("📋 Copied! Open sing-box → Import from clipboard → Connect");
                 });
-                
             } catch (Exception e) {
                 log("Error: " + e.getMessage());
             }
         });
     }
     
-    private void execOnServer(String cmd) {
-        String host = etHost.getText().toString().trim();
-        String pass = etPassword.getText().toString().trim();
-        if (host.isEmpty()) { log("Enter host"); return; }
+    private void runCmd(String cmd) {
+        String h = etHost.getText().toString().trim();
+        String p = etPassword.getText().toString().trim();
+        if (h.isEmpty()) { log("Enter host"); return; }
         tvOutput.setText("");
-        
         executor.execute(() -> {
             try {
-                Session session = connect(host, pass);
-                log(exec(session, cmd));
-                session.disconnect();
+                Session s = connect(h, p);
+                log(exec(s, cmd));
+                s.disconnect();
             } catch (Exception e) {
                 log("Error: " + e.getMessage());
             }
@@ -170,30 +133,27 @@ public class MainActivity extends AppCompatActivity {
     
     private Session connect(String host, String pass) throws Exception {
         JSch jsch = new JSch();
-        Session session = jsch.getSession("root", host, 22);
-        session.setPassword(pass);
-        session.setConfig("StrictHostKeyChecking", "no");
-        session.connect(10000);
-        return session;
+        Session s = jsch.getSession("root", host, 22);
+        s.setPassword(pass);
+        s.setConfig("StrictHostKeyChecking", "no");
+        s.connect(10000);
+        return s;
     }
     
-    private String exec(Session session, String cmd) throws Exception {
-        ChannelExec channel = (ChannelExec) session.openChannel("exec");
-        channel.setCommand(cmd);
+    private String exec(Session s, String cmd) throws Exception {
+        ChannelExec ch = (ChannelExec) s.openChannel("exec");
+        ch.setCommand(cmd);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        channel.setOutputStream(out);
-        channel.setErrStream(out);
-        channel.connect();
-        while (!channel.isClosed()) Thread.sleep(100);
-        channel.disconnect();
+        ch.setOutputStream(out);
+        ch.setErrStream(out);
+        ch.connect();
+        while (!ch.isClosed()) Thread.sleep(100);
+        ch.disconnect();
         return out.toString();
     }
     
     private void log(String msg) {
-        handler.post(() -> {
-            tvOutput.append(msg + "\n");
-            scrollView.fullScroll(View.FOCUS_DOWN);
-        });
+        handler.post(() -> { tvOutput.append(msg + "\n"); scrollView.fullScroll(View.FOCUS_DOWN); });
     }
     
     @Override
