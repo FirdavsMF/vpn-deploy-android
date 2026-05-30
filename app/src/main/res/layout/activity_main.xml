@@ -3,13 +3,15 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="16dp"
+    android:background="#121212">
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="🖥 VPS Deploy"
+        android:text="🚀 VPN Deploy"
         android:textSize="24sp"
+        android:textColor="#ffffff"
         android:textStyle="bold"
         android:layout_marginBottom="16dp"/>
 
@@ -17,68 +19,27 @@
         android:id="@+id/etHost"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="IP адрес VPS"
-        android:inputType="text"
+        android:hint="VPS IP Address"
+        android:textColor="#ffffff"
+        android:textColorHint="#888888"
+        android:backgroundTint="#1a73e8"
         android:layout_marginBottom="8dp"/>
 
     <EditText
         android:id="@+id/etPassword"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="SSH пароль"
+        android:hint="SSH Password"
         android:inputType="textPassword"
+        android:textColor="#ffffff"
+        android:textColorHint="#888888"
+        android:backgroundTint="#1a73e8"
         android:layout_marginBottom="16dp"/>
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Сервисы:"
-        android:textStyle="bold"
-        android:layout_marginBottom="8dp"/>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal">
-
-        <CheckBox
-            android:id="@+id/cbVless"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="VLESS"
-            android:checked="true"/>
-
-        <CheckBox
-            android:id="@+id/cbSS"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="SS"
-            android:checked="true"/>
-
-        <CheckBox
-            android:id="@+id/cbHY2"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="HY2"
-            android:checked="true"/>
-
-        <CheckBox
-            android:id="@+id/cbSSH"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="SSH"
-            android:checked="true"/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="16dp">
 
         <Button
             android:id="@+id/btnDeploy"
@@ -110,7 +71,7 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:layout_marginTop="16dp"
-        android:background="#1a1a1a">
+        android:background="#1e1e1e">
 
         <TextView
             android:id="@+id/tvOutput"
@@ -118,8 +79,8 @@
             android:layout_height="wrap_content"
             android:textColor="#00ff00"
             android:typeface="monospace"
-            android:padding="8dp"
-            android:text="Готов к подключению...\n"/>
+            android:padding="12dp"
+            android:text="Ready...\n"/>
     </ScrollView>
 
 </LinearLayout>
