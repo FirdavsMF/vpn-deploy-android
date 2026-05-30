@@ -1,7 +1,6 @@
 package com.vpndeploy;
 
 import android.os.Bundle;
-import android.util.Base64;
 import android.view.View;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
@@ -21,7 +20,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        
         initViews();
         setListeners();
     }
@@ -61,13 +59,12 @@ public class MainActivity extends AppCompatActivity {
     private void deployServices() {
         String host = etHost.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
+        String services = getServices();
         
         if (host.isEmpty() || password.isEmpty()) {
             appendOutput("❌ Host and password required!\n");
             return;
         }
-        
-        String services = getServices();
         
         executor.execute(() -> {
             try {
@@ -75,32 +72,15 @@ public class MainActivity extends AppCompatActivity {
                 ssh.connect();
                 appendOutput("✅ Connected\n");
                 
-                // Проверяем есть ли уже vps на сервере
-                String check = ssh.exec("test -f /tmp/vps && echo yes || echo no");
-                
-                if (check.contains("no")) {
-                    appendOutput("📤 Uploading vps binary...\n");
-                    
-                    byte[] vpsBin = getVpsBinary();
-                    String b64 = Base64.encodeToString(vpsBin, Base64.NO_WRAP);
-                    
-                    // Разбиваем base64 на части по 1000 символов
-                    int chunkSize = 1000;
-                    for (int i = 0; i < b64.length(); i += chunkSize) {
-                        int end = Math.min(i + chunkSize, b64.length());
-                        String chunk = b64.substring(i, end);
-                        if (i == 0) {
-                            ssh.exec("echo '" + chunk + "' > /tmp/vps.b64");
-                        } else {
-                            ssh.exec("echo '" + chunk + "' >> /tmp/vps.b64");
-                        }
-                    }
-                    ssh.exec("base64 -d /tmp/vps.b64 > /tmp/vps && chmod +x /tmp/vps && rm /tmp/vps.b64");
-                    appendOutput("✅ Binary uploaded\n");
-                }
+                // Загружаем бинарник через SFTP
+                appendOutput("📤 Uploading vps...\n");
+                byte[] vpsBin = getVpsBinary();
+                ssh.upload(vpsBin, "/tmp/vps");
+                ssh.exec("chmod +x /tmp/vps");
+                appendOutput("✅ Uploaded (" + (vpsBin.length / 1024 / 1024) + " MB)\n");
                 
                 // Деплой
-                appendOutput("🚀 Deploying services...\n");
+                appendOutput("🚀 Deploying...\n");
                 String result = ssh.exec("/tmp/vps deploy -H " + host + " --password " + password + " -s " + services);
                 appendOutput(result);
                 
@@ -128,31 +108,26 @@ public class MainActivity extends AppCompatActivity {
     }
     
     private void checkStatus() {
-        String host = etHost.getText().toString().trim();
-        String password = etPassword.getText().toString().trim();
-        execSimple(host, password, "/tmp/vps status -H " + host + " --password " + password);
+        execOnServer("/tmp/vps status -H " + etHost.getText().toString().trim() + " --password " + etPassword.getText().toString().trim());
     }
     
     private void downloadConfigs() {
-        String host = etHost.getText().toString().trim();
-        String password = etPassword.getText().toString().trim();
-        execSimple(host, password, 
-            "/tmp/vps configs -H " + host + " --password " + password +
-            " -s " + getServices() + " -o /tmp/cfg && find /tmp/cfg -type f -exec echo '=== {} ===' \\; -exec cat {} \\;");
+        execOnServer("/tmp/vps configs -H " + etHost.getText().toString().trim() + " --password " + etPassword.getText().toString().trim() + " -s " + getServices() + " -o /tmp/cfg && cat /tmp/cfg/all-configs.txt 2>/dev/null || find /tmp/cfg -type f -exec cat {} \\;");
     }
     
-    private void execSimple(String host, String password, String cmd) {
+    private void execOnServer(String cmd) {
+        String host = etHost.getText().toString().trim();
+        String password = etPassword.getText().toString().trim();
+        
         btnDeploy.setEnabled(false);
         btnStatus.setEnabled(false);
         btnConfigs.setEnabled(false);
         tvOutput.setText("");
-        appendOutput("⚡ " + host + "\n");
         
         executor.execute(() -> {
             try {
                 SshClient ssh = new SshClient(host, 22, "root", password);
                 ssh.connect();
-                appendOutput("✅ Connected\n");
                 String result = ssh.exec(cmd);
                 appendOutput(result);
                 ssh.close();
